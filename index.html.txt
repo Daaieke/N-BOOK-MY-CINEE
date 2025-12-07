@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Book My Cinee — Bookie Cookie</title>
+<style>
+  :root{
+    --bg:#0b0f12; --card:#142028; --accent:#ff4500; --text:#e6eef3;
+    --muted:#99a3ad; --selected:#00c851; --booked:#b30000;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+  .app{max-width:1100px;margin:18px auto;padding:14px;position:relative;z-index:1}
+
+  /* ---------- INTRO (FULLSCREEN) ---------- */
+  #introScreen{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#000 0%, #081018 60%); z-index:9999; overflow:hidden;
+  }
+
+  /* smoky gradient layers */
+  #introScreen .bg-layer {
+    position:absolute; inset:0; opacity:0.12; background:
+    radial-gradient(ellipse at 20% 30%, rgba(255,90,0,0.12) 0%, transparent 25%),
+    radial-gradient(ellipse at 80% 70%, rgba(0,160,255,0.06) 0%, transparent 30%);
+    filter:blur(18px);
+    mix-blend-mode: screen;
+  }
+
+  /* logo container */
+  .logo-wrap {
+    text-align:center; transform:translateY(6%);
+  }
+
+  .intro-logo {
+    display:inline-block;
+    color:var(--accent);
+    font-weight:900;
+    letter-spacing:6px;
+    font-size:3.6rem;
+    text-transform:uppercase;
+    position:relative;
+    transform-origin:center center;
+    filter:drop-shadow(0 8px 18px rgba(0,0,0,0.8));
+  }
+
+  /* neon stroke */
+  .intro-logo::before {
+    content: "";
+    position:absolute; inset:-6px; border-radius:8px; pointer-events:none;
+    background: linear-gradient(90deg, rgba(255,69,0,0.12), rgba(255,200,60,0.06));
+    mix-blend-mode: screen; filter: blur(8px);
+  }
+
+  /* letter reveal */
+  .intro-chars { display:inline-block; overflow:visible; }
+  .intro-chars span {
+    display:inline-block;
+    transform-origin:center;
+    opacity:0; transform:translateY(40%) scale(0.85);
+    color: var(--accent);
+    text-shadow:0 0 14px rgba(255,80,10,0.45);
+  }
+
+  /* flare line */
+  .flare {
+    position:absolute; left:50%; top:50%; width:1200px; height:2px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    transform:translate(-50%,-130%) rotate(-10deg); opacity:0;
+    filter:blur(20px) contrast(120%);
+  }
+
+  /* pulse glow under logo */
+  .logo-glow {
+    position:absolute; left:50%; top:60%; width:420px; height:120px;
+    transform:translateX(-50%); border-radius:50%;
+    background: radial-gradient(ellipse at center, rgba(255,69,0,0.14), transparent 40%);
+    mix-blend-mode:screen; opacity:0;
+    filter:blur(18px);
+  }
+
+  /* subtle vertical bars */
+  .scanlines { position:absolute; inset:0; background-image: linear-gradient(rgba(255,255,255,0.00) 0.5px, transparent 0.5px); background-size:100% 6px; opacity:0.02; }
+
+  /* animation timings */
+  @keyframes letterIn {
+    0% { opacity:0; transform:translateY(40%) scale(0.85) rotateX(30deg); filter:blur(3px); }
+    60% { opacity:1; transform:translateY(-6%) scale(1.06) rotateX(0deg); filter:blur(0px); }
+    100% { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes logoPop {
+    0% { transform: scale(0.18) rotate(-1deg); opacity:0 }
+    48% { transform: scale(1.18) rotate(0deg); opacity:1 }
+    100% { transform: scale(1); opacity:1 }
+  }
+  @keyframes flareIn {
+    0% { opacity:0; transform:translate(-50%,-130%) rotate(-10deg) scaleX(0.2) }
+    50% { opacity:1; transform:translate(-50%,-140%) rotate(-10deg) scaleX(1.0) }
+    100% { opacity:0; transform:translate(-50%,-300%) rotate(-10deg) scaleX(1.2) }
+  }
+  @keyframes glowPulse {
+    0% { opacity:0; transform:scaleX(0.9) }
+    45% { opacity:1; transform:scaleX(1.1) }
+    100% { opacity:0; transform:scaleX(1.3) }
+  }
+
+  /* apply animations with fine-grained delays for cinematic effect */
+  .intro-logo { animation: logoPop 1.2s cubic-bezier(.2,.9,.2,1) 0.08s both; }
+  .intro-chars span { animation: letterIn .8s cubic-bezier(.2,.9,.2,1) both; }
+  .flare { animation: flareIn 1.05s cubic-bezier(.2,.9,.2,1) 0.75s both; }
+  .logo-glow { animation: glowPulse 1.4s ease 0.35s both; }
+
+  /* after intro finishes we fade entire intro out */
+  .intro-fadeout { animation: fadeOut 0.6s ease 1s forwards; }
+  @keyframes fadeOut { to { opacity:0; visibility:hidden } }
+
+  /* flicker effect on neon */
+  @keyframes neonFlicker {
+    0%,100% { text-shadow: 0 0 18px rgba(255,90,30,0.55), 0 0 32px rgba(255,50,0,0.18); }
+    4% { text-shadow: none; opacity:0.92 }
+    7% { text-shadow: 0 0 10px rgba(255,70,20,0.4) }
+    11% { text-shadow:none; opacity:0.95 }
+  }
+  .flicker { animation: neonFlicker 2.2s linear both; }
+
+  /* ---------- APP (below intro) ---------- */
+  .header{background:var(--accent);padding:14px;border-radius:8px;text-align:center;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,0.35)}
+  .hidden{display:none}
+  .login-card, .movies, .seats-screen, .confirm-screen, .payment-screen, .success-screen
+    { background:var(--card); padding:14px;border-radius:10px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.25); margin-top:15px; }
+
+  input{width:100%;padding:10px;border-radius:6px;border:1px solid #21323a;background:#0f1315;color:var(--text);margin-top:8px}
+  button{padding:10px 12px;border-radius:6px;border:none;cursor:pointer}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-ghost{background:#263238;color:#fff}
+  .small{padding:6px 10px;font-size:0.85rem}
+  .muted{color:var(--muted)}
+
+  .movies-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px}
+  .card{padding:8px;border-radius:8px;background:linear-gradient(180deg,#1b2730,#0f171b);text-align:center}
+  .poster{width:100%;height:240px;border-radius:6px;background-size:cover;background-position:center}
+  .movie-title{margin-top:8px;font-weight:700}
+  .movie-sub{color:var(--muted);font-size:0.9rem}
+
+  .seat-container{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;margin-top:12px}
+  .seat{width:100%;padding-top:100%;position:relative;border-radius:6px;background:#333;cursor:pointer}
+  .seat > span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.85rem}
+  .seat.selected{background:var(--selected)}
+  .seat.booked{background:var(--booked);cursor:not-allowed;opacity:0.95}
+  @media (max-width:520px){ .seat-container{grid-template-columns:repeat(5,1fr)} .poster{height:160px} }
+</style>
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div id="introScreen">
+  <div class="bg-layer"></div>
+  <div class="scanlines"></div>
+
+  <div class="logo-wrap">
+    <div class="intro-logo flicker" aria-hidden="true">
+      <span class="intro-chars" id="introText"></span>
+    </div>
+    <div class="logo-glow" aria-hidden="true"></div>
+  </div>
+
+  <div class="flare" aria-hidden="true"></div>
+</div>
+
+<!-- APPLICATION -->
+<div class="app" id="appRoot" aria-hidden="true">
+  <div class="header">BOOK MY CINEE — Bookie Cookie</div>
+
+  <!-- LOGIN -->
+  <div id="loginScreen" class="login-card hidden">
+    <h3>Login / Sign Up</h3>
+    <input id="email" type="email" placeholder="Email" autocomplete="email"/>
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password"/>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="btnLogin" class="btn-primary">Login</button>
+      <button id="btnSignup" class="btn-ghost">Sign up</button>
+    </div>
+    <p id="loginMsg" class="muted"></p>
+  </div>
+
+  <!-- MOVIES PAGE -->
+  <div id="moviesScreen" class="movies hidden" aria-hidden="true">
+    <div style="display:flex;align-items:center;gap:12px">
+      <h2 style="margin:0">Now Showing</h2>
+      <div style="margin-left:auto">User: <strong id="userEmail"></strong>
+        <button id="logoutBtn" class="small">Logout</button></div>
+    </div>
+    <div class="movies-grid" id="moviesGrid"></div>
+  </div>
+
+  <!-- SEATS -->
+  <div id="seatsScreen" class="seats-screen hidden" aria-hidden="true">
+    <button id="backToMovies" class="small">← Back</button>
+    <h3 id="selectedMovieTitle"></h3>
+    <p class="muted">Tap seats to select</p>
+    <div id="seatContainer" class="seat-container"></div>
+
+    <div class="controls" style="margin-top:12px">
+      <p class="muted">Selected: <span id="selectedCount">0</span></p>
+      <p class="muted" style="margin-left:auto">Price per seat: <b>₹120</b></p>
+    </div>
+
+    <div class="controls" style="margin-top:12px">
+      <button class="btn-primary" id="btnConfirm">Confirm</button>
+      <button class="btn-ghost" id="btnClear">Clear</button>
+    </div>
+  </div>
+
+  <!-- CONFIRM -->
+  <div id="confirmScreen" class="confirm-screen hidden" aria-hidden="true">
+    <h3>Confirm Booking</h3>
+    <p class="muted">Movie: <b id="confirmMovie"></b></p>
+    <p class="muted">Seats: <b id="confirmSeats"></b></p>
+    <p class="muted">Total: <b id="confirmTotal"></b></p>
+
+    <div class="controls">
+      <button id="toPayment" class="btn-primary">Proceed to Payment</button>
+      <button id="backToSeats" class="btn-ghost">Back</button>
+    </div>
+  </div>
+
+  <!-- PAYMENT -->
+  <div id="paymentScreen" class="payment-screen hidden" aria-hidden="true">
+    <h3>Payment (Mock)</h3>
+    <input id="cardName" type="text" placeholder="Card Holder Name" />
+    <input id="cardNumber" type="text" placeholder="Card Number" />
+    <input id="cardExp" type="text" placeholder="MM/YY" />
+    <input id="cardCvv" type="text" placeholder="CVV" />
+
+    <div class="controls" style="margin-top:12px">
+      <button id="payBtn" class="btn-primary">Pay Now</button>
+      <button id="payBack" class="btn-ghost">Back</button>
+    </div>
+    <p class="muted">This is a fake payment for project demo</p>
+  </div>
+
+  <!-- SUCCESS -->
+  <div id="successScreen" class="success-screen hidden" aria-hidden="true" style="text-align:center">
+    <h2>🎉 Booking Confirmed!</h2>
+    <p id="successDetails" class="muted"></p>
+    <button id="goMovies" class="btn-primary">Back to Movies</button>
+  </div>
+</div>
+
+<script>
+/* ============================
+  Cinematic Intro + App Script
+   - letter animation
+   - small "DUM" sound via WebAudio
+   - then reveal app and boot
+============================ */
+
+/* --------------- Intro text split into chars --------------- */
+const introText = "BOOK MY CINEE";
+const introContainer = document.getElementById("introText");
+introText.split("").forEach((ch, i) => {
+  const span = document.createElement("span");
+  span.textContent = ch === " " ? "\u00A0" : ch;
+  span.style.animationDelay = `${0.18 + i * 0.06}s`; // stagger
+  introContainer.appendChild(span);
+});
+
+/* --------------- Sound: short low 'DUM' + sub-bass thump --------------- */
+function playDramaticDum() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+
+    // low sine (sub-bass)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(55, now); // low fundamental
+    gain1.gain.setValueAtTime(0.0001, now);
+    gain1.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+    osc1.connect(gain1).connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 1.1);
+
+    // noise transient for attack
+    const bufferSize = ctx.sampleRate * 0.12;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / 2000);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.8, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    noise.connect(noiseGain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + 0.12);
+
+  } catch (e) {
+    // autoplay may block; ignore gracefully
+    console.warn("Audio failed:", e);
+  }
+}
+
+/* --------------- Run intro sequence --------------- */
+const introScreen = document.getElementById("introScreen");
+const appRoot = document.getElementById("appRoot");
+
+/* Play sound when possible (try immediately) */
+setTimeout(() => {
+  playDramaticDum();
+}, 560); // time it to coincide with letter pop
+
+/* After full animation, fade intro and reveal app */
+const INTRO_DURATION = 3200; // ms (adjust if you change CSS timings)
+setTimeout(() => {
+  // fade out animation
+  introScreen.style.transition = "opacity .5s ease, visibility .5s ease";
+  introScreen.style.opacity = "0";
+  // reveal app once intro hidden
+  setTimeout(() => {
+    introScreen.style.display = "none";
+    appRoot.removeAttribute("aria-hidden");
+    initApp(); // start app after intro
+  }, 520);
+}, INTRO_DURATION);
+
+/* ============================
+  Application (login, movies, seats, payment)
+============================ */
+
+function initApp(){
+  // APP constants
+  const seatPrice = 120;
+  const MOVIES = [
+    { id:"movie1", title:"KGF: Chapter 2",
+      poster:"https://m.media-amazon.com/images/S/pv-target-images/dbe30e1e25813a698e0da679a5968c380bd2d1b4e6966394d4c964c6b3301896.jpg", seats:32 },
+    { id:"movie2", title:"Avengers: Endgame",
+      poster:"https://play-lh.googleusercontent.com/XDg-bt655am_Q-7X-I0s64Kq8SJKfb7BBTHkUVbFR6-zDNv9J7rW61xZn0BB3SVCJ6gz", seats:42 },
+    { id:"movie3", title:"The Dark Knight",
+      poster:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSukv8pWO1XbxpLOxyeXva-rxXlJ2n7bE3BPA&s", seats:56 },
+    { id:"movie4", title:"Interstellar",
+      poster:"https://upload.wikimedia.org/wikipedia/en/b/bc/Interstellar_film_poster.jpg", seats:60 },
+    { id:"movie5", title:"Inception",
+      poster:"https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_.jpg", seats:48 },
+    { id:"movie6", title:"Baahubali",
+      poster:"https://m.media-amazon.com/images/S/pv-target-images/274431b8945f779acab499a1625c2a3c9ebe1054d112aed3e55cd89c7d2ce41c.jpg", seats:40 },
+    { id:"movie7", title:"3 Idiots",
+      poster:"https://images.justwatch.com/poster/115370120/s718/3-idiots.jpg", seats:36 },
+    { id:"movie8", title:"Joker",
+      poster:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQP7TzsGto_FJI2I9IibPV1GWd--ki-_NAAYQ&s", seats:44 },
+    { id:"movie9", title:"Parasite",
+      poster:"https://m.media-amazon.com/images/M/MV5BYjk1Y2U4MjQtY2ZiNS00OWQyLWI3MmYtZWUwNmRjYWRiNWNhXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg", seats:30 },
+    { id:"movie10", title:"The Matrix",
+      poster:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSlUjxumdxAvGAdREATkNJkkgYQq7Ll3BUYOA&s", seats:50 }
+  ];
+
+  // Utilities
+  function users(){ return JSON.parse(localStorage.getItem("bm_users_v1")) || []; }
+  function saveUsers(u){ localStorage.setItem("bm_users_v1", JSON.stringify(u)); }
+  function currentUser(){ return sessionStorage.getItem("bm_user_email") || null; }
+  function setCurrentUser(email){ sessionStorage.setItem("bm_user_email", email); }
+  function clearCurrentUser(){ sessionStorage.removeItem("bm_user_email"); }
+
+  // DOM refs
+  const loginScreen = document.getElementById("loginScreen");
+  const moviesScreen = document.getElementById("moviesScreen");
+  const seatsScreen = document.getElementById("seatsScreen");
+  const confirmScreen = document.getElementById("confirmScreen");
+  const paymentScreen = document.getElementById("paymentScreen");
+  const successScreen = document.getElementById("successScreen");
+
+  const emailEl = document.getElementById("email");
+  const passEl = document.getElementById("password");
+  const loginMsg = document.getElementById("loginMsg");
+  const userEmailText = document.getElementById("userEmail");
+
+  const moviesGrid = document.getElementById("moviesGrid");
+  const seatContainer = document.getElementById("seatContainer");
+  const selectedCount = document.getElementById("selectedCount");
+
+  // init auth handlers
+  document.getElementById("btnSignup").addEventListener("click", () => {
+    const em = emailEl.value.trim().toLowerCase(); const pw = passEl.value.trim();
+    if(!em || !pw){ loginMsg.innerText = "Enter valid email and password"; return; }
+    const u = users();
+    if(u.find(x=>x.email===em)){ loginMsg.innerText = "User exists — use Login"; return; }
+    u.push({ email: em, password: pw }); saveUsers(u);
+    loginMsg.innerText = "Signed up. Now login.";
+  });
+
+  document.getElementById("btnLogin").addEventListener("click", () => {
+    const em = emailEl.value.trim().toLowerCase(); const pw = passEl.value.trim();
+    const u = users().find(x=>x.email===em && x.password===pw);
+    if(!u){ loginMsg.innerText = "Invalid credentials"; return; }
+    setCurrentUser(em); startApp();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => { clearCurrentUser(); show("login"); });
+
+  // movies render
+  function renderMovies(){
+    moviesGrid.innerHTML = "";
+    MOVIES.forEach(m=>{
+      const c = document.createElement("div"); c.className="card";
+      c.innerHTML = `
+        <div class="poster" style="background-image:url('${m.poster}')"></div>
+        <div class="movie-title">${m.title}</div>
+        <div class="movie-sub">Seats: ${m.seats}</div>
+        <div style="margin-top:8px"><button class="small" data-id="${m.id}">Book</button></div>
+      `;
+      moviesGrid.appendChild(c);
+    });
+    moviesGrid.querySelectorAll("button[data-id]").forEach(btn=>{
+      btn.addEventListener("click", (e) => openSeats(e.target.dataset.id));
+    });
+  }
+
+  // seat logic
+  let workingMovie = null;
+  let selectedSeats = [];
+
+  function getBooked(movieId){ try { return JSON.parse(localStorage.getItem(`booked_${movieId}`)) || []; } catch(e) { return []; } }
+  function saveBooked(movieId, arr){ localStorage.setItem(`booked_${movieId}`, JSON.stringify(arr)); }
+
+  function openSeats(movieId){
+    workingMovie = MOVIES.find(m=>m.id===movieId);
+    selectedSeats = [];
+    document.getElementById("selectedMovieTitle").innerText = workingMovie.title;
+    renderSeatGrid();
+    show("seats");
+  }
+
+  function renderSeatGrid(){
+    const booked = getBooked(workingMovie.id);
+    seatContainer.innerHTML = "";
+    for(let i=1;i<=workingMovie.seats;i++){
+      const seat = document.createElement("div");
+      seat.className = "seat";
+      seat.dataset.seat = i;
+      seat.innerHTML = `<span>${i}</span>`;
+      if(booked.includes(i)) seat.classList.add("booked");
+      seat.addEventListener("click", () => {
+        if(seat.classList.contains("booked")) return;
+        seat.classList.toggle("selected");
+        const num = parseInt(seat.dataset.seat);
+        if(seat.classList.contains("selected")){
+          if(!selectedSeats.includes(num)) selectedSeats.push(num);
+        } else {
+          selectedSeats = selectedSeats.filter(x=>x!==num);
+        }
+        selectedCount.innerText = selectedSeats.length;
+      });
+      seatContainer.appendChild(seat);
+    }
+    selectedCount.innerText = selectedSeats.length;
+  }
+
+  // controls
+  document.getElementById("btnClear").addEventListener("click", () => { selectedSeats=[]; renderSeatGrid(); });
+  document.getElementById("backToMovies").addEventListener("click", () => show("movies"));
+
+  document.getElementById("btnConfirm").addEventListener("click", () => {
+    if(selectedSeats.length===0){ alert("Select at least one seat"); return; }
+    document.getElementById("confirmMovie").innerText = workingMovie.title;
+    document.getElementById("confirmSeats").innerText = selectedSeats.join(", ");
+    document.getElementById("confirmTotal").innerText = "₹" + (selectedSeats.length * seatPrice);
+    show("confirm");
+  });
+
+  document.getElementById("backToSeats").addEventListener("click", () => show("seats"));
+  document.getElementById("toPayment").addEventListener("click", () => show("payment"));
+
+  document.getElementById("payBack").addEventListener("click", () => show("confirm"));
+  document.getElementById("payBtn").addEventListener("click", () => {
+    const name = document.getElementById("cardName").value.trim();
+    const num = document.getElementById("cardNumber").value.replace(/\s+/g,'');
+    if(!name || num.length<8){ alert("Enter valid mock card details"); return; }
+
+    // save booked seats
+    const booked = getBooked(workingMovie.id);
+    const newBooked = Array.from(new Set(booked.concat(selectedSeats))).sort((a,b)=>a-b);
+    saveBooked(workingMovie.id, newBooked);
+
+    // show success
+    document.getElementById("successDetails").innerText =
+      `Movie: ${workingMovie.title} | Seats: ${selectedSeats.join(", ")} | Amount: ₹${selectedSeats.length*seatPrice}`;
+
+    // play small success DING
+    setTimeout(() => playSimpleDing(), 180);
+    show("success");
+  });
+
+  document.getElementById("goMovies").addEventListener("click", () => { renderMovies(); show("movies"); });
+
+  // nav helpers
+  function show(name){
+    // hide all main screens then show chosen
+    [loginScreen, moviesScreen, seatsScreen, confirmScreen, paymentScreen, successScreen].forEach(s => s.classList.add("hidden"));
+    const el = {
+      login: loginScreen,
+      movies: moviesScreen,
+      seats: seatsScreen,
+      confirm: confirmScreen,
+      payment: paymentScreen,
+      success: successScreen
+    }[name];
+    if(el) el.classList.remove("hidden");
+  }
+
+  // app start
+  function startApp(){
+    const user = currentUser();
+    if(!user) { show("login"); return; }
+    document.getElementById("userEmail").innerText = user;
+    renderMovies();
+    show("movies");
+  }
+
+  startApp();
+
+  // success ding
+  function playSimpleDing(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = "triangle"; o.frequency.setValueAtTime(900, ctx.currentTime);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.4);
+      o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.45);
+    } catch(e){ /* ignore */ }
+  }
+
+  // expose for debugging if needed
+  window._bm = { MOVIES, startApp, renderMovies };
+} // end initApp
+</script>
+</body>
+</html>
